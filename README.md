@@ -14,7 +14,7 @@ The audience for this project are our peers and superiors on the data science te
 
 ## Deliverables
 
-### Need to Haves
+### Need to Haves:
 1. Final Report (jupyter notebook)
 2. Modules:
     - wrangle_zillow.py
@@ -38,4 +38,4 @@ A data dictionary for the features contained in our final report can be found [h
 All files necessary for cloning and reproducing the work found in the final_project.ipynb file are contained within this repository.
 
 ## Planning
-Additional planning documentation can be found [here](https://docs.google.com/document/d/1MtDXR6I8l17Uzs2W4m7RgUuDnVxEzJ0aZqfjWwlpc4M/edit?usp=sharing).
+<!-- Additional planning documentation can be found [here](https://docs.google.com/document/d/1MtDXR6I8l17Uzs2W4m7RgUuDnVxEzJ0aZqfjWwlpc4M/view?usp=sharing). -->
