@@ -89,6 +89,17 @@ def handle_missing_values(df, prop_required_column = .60, prop_required_row = .6
     df.dropna(axis=0, thresh=threshold, inplace=True)
     return df
 
+def convert_dtypes(df):
+    """
+    Function does the follwing:
+    1. Takes in a DataFrame
+    2. Returns a DataFrame with some of the initally numeric variables converted to strings as they are more categorical by nature.
+    """
+    # convert some numeric variables that are categorical by nature so that they do not end up scaled
+    for col in ['fips', 'regionidcity', 'regionidcounty', 'regionidzip']:
+        df[col] = df[col].astype('object')
+    return df
+
 def impute_regionidcity(train, validate, test):
     """
     This function does the following:
