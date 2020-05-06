@@ -72,7 +72,24 @@ def nulls_by_row(df):
     }).reset_index().groupby(['num_cols_missing','pct_cols_missing']).count().rename(index=str, columns={'index': 'num_rows'}).reset_index()
     return rows_missing
 
-def remove_columns(df, cols_to_remove):
+def get_single_unit_properties(df):
+    """
+    Docstring
+    """
+
+    # removing any properties that are likely to be something other than single unit properties
+    df = df[df.propertylandusetypeid.isin([260, 261, 262, 279])]
+    df = df[(df.bedroomcnt > 0) & (df.bathroomcnt > 0)]
+
+    # unitcnt imputation
+    df.unitcnt = df.unitcnt.fillna(1.0)
+
+    # filter out units with more than one unit
+    df = df[df.unitcnt == 1.0]
+
+    return df
+
+def remove_columns(df, cols_to_remove=[]):
     """
     Docstring
     """
@@ -89,15 +106,62 @@ def handle_missing_values(df, prop_required_column = .60, prop_required_row = .6
     df.dropna(axis=0, thresh=threshold, inplace=True)
     return df
 
-def convert_dtypes(df):
+def impute_missing_values(df):
     """
-    Function does the follwing:
-    1. Takes in a DataFrame
-    2. Returns a DataFrame with some of the initally numeric variables converted to strings as they are more categorical by nature.
+    Docstring
     """
-    # convert some numeric variables that are categorical by nature so that they do not end up scaled
-    for col in ['fips', 'regionidcity', 'regionidcounty', 'regionidzip']:
-        df[col] = df[col].astype('object')
+
+    # heatingorsystemdesc imputation with "None" as properties are in SoCal so having no heating system is reasonable
+    df.heatingorsystemdesc = df.heatingorsystemdesc.fillna("None")
+
+    # buildingqualitytypeid imputation
+    df.buildingqualitytypeid = df.buildingqualitytypeid.fillna(df.buildingqualitytypeid.median())
+
+    # lotsizesquarefeet imputation with mode
+    df.lotsizesquarefeet = df.lotsizesquarefeet.fillna(6000.0)
+
+    # calculatedbathnbr imputation
+    df.calculatedbathnbr = df.calculatedbathnbr.fillna(df.calculatedbathnbr.median())
+
+    # calculatedfinishedsquarefeet imputation with mode
+    df.calculatedfinishedsquarefeet = df.calculatedfinishedsquarefeet.fillna(1120.0)
+
+    # fullbathcnt imputation
+    df.fullbathcnt = df.fullbathcnt.fillna(df.fullbathcnt.median())
+
+    # yearbuilt imputation
+    df.yearbuilt = df.yearbuilt.fillna(round(df.yearbuilt.mean()))
+
+    # structuretaxvaluedollarcnt imputation based on the difference between taxvaluedollarcnt and landtaxvaluedollarcnt as 
+    # 99.9% of the values in structuretaxvaluedollarcnt are equal to this difference
+    df.structuretaxvaluedollarcnt = df.structuretaxvaluedollarcnt.fillna(df.taxvaluedollarcnt - df.landtaxvaluedollarcnt)
+
+    return df
+
+def remove_rows(df, cols_to_mask=[]):
+    """
+    Docstring
+    """
+
+    for col in cols_to_mask:
+        df.drop(index=df[df[col].isna() == True].index.tolist(), inplace=True)
+
+    return df
+
+def create_new_variables(df):
+    """
+    Function does the following:
+    1. Creates the county variable using the fips codes
+    2. Calculates the tax_rate variable
+    3. Returns an updated DataFrame
+    """
+
+    # creating county variable
+    df["county"] = df["fips"].map({6037: "Los Angeles County", 6059: "Orange County", 6111: "Ventura County"})
+
+    # creating tax_rate variable
+    df["tax_rate"] = df.taxamount / df.taxvaluedollarcnt
+
     return df
 
 def impute_regionidcity(train, validate, test):
@@ -108,21 +172,36 @@ def impute_regionidcity(train, validate, test):
     3. Fits the object to the regionidcity feature in the train dataset
     4. Transforms the regionidcity feature in the train, validate, and test datasets
     """
+
     imputer = KNNImputer(n_neighbors=5)
     imputer.fit(train[["regionidcity"]])
     train["regionidcity"] = imputer.transform(train[["regionidcity"]])
     validate["regionidcity"] = imputer.transform(validate[["regionidcity"]])
     test["regionidcity"] = imputer.transform(test[["regionidcity"]])
+
     return imputer, train, validate, test
+
+def convert_dtypes(df, columns=[], dtype="object"):
+    """
+    Function does the follwing:
+    1. Takes in a DataFrame, specified columns to transform as a list, and the desired data type of the specified columns as a string
+    2. Returns a DataFrame with columns converted to specified dtype
+    """
+
+    # convert some numeric variables that are categorical by nature so that they do not end up scaled
+    for col in columns:
+        df[col] = df[col].astype(dtype)
+
+    return df
 
 def scale_numeric_data(train, validate, test):
     """
     Docstring
     """
-    # convert some numeric variables that are categorical by nature so that they do not end up scaled
-    for col in ['fips', 'regionidcity', 'regionidcounty', 'regionidzip']:
-        train[col] = train[col].astype('object')
-    
+
+    # convert some numeric variables that are categorical by nature into objects so that they do not end up scaled
+    train = convert_dtypes(train, columns=['fips', 'regionidcity', 'regionidcounty', 'regionidzip'], dtype="object")
+
     # creating a list of features whose data type is number
     numeric_columns = train.select_dtypes("number").columns.tolist()
 
@@ -140,73 +219,32 @@ def prep_zillow(df):
     Docstring
     """
 
-    # removing any properties that are likely to be something other than single unit properties
-    df = df[df.propertylandusetypeid.isin([260, 261, 262, 279])]
-    df = df[(df.bedroomcnt > 0) & (df.bathroomcnt > 0)]
+    # get single unit properties
+    df = get_single_unit_properties(df)
 
-    # unitcnt imputation
-    df.unitcnt = df.unitcnt.fillna(1.0)
-
-    # filter out units with more than one unit
-    df = df[df.unitcnt == 1.0]
-
-    # dropping unnecessary columns
-    df.drop(columns="id", inplace=True)
+    # calling remove_columns
+    # dropping unnecessary id columns
+    # dropping propertyzoningdesc as we have already filtered the data to single unit properties
+    # 99.7% of the values in finishedsquarefeet12 are the same as calculatedfinishedsquarefeet
+    # drop finishedsquarefeet12 as the info appears to be redundant when compared to calculatedfinishedsquarefeet
+    df = remove_columns(df, cols_to_remove=["id", "propertylandusetypeid", "heatingorsystemtypeid", "propertyzoningdesc", "finishedsquarefeet12"])
 
     # calling handle_missing_values to remove columns and rows that do not meet the default threshold critera necessary to retain variable or index
     df = handle_missing_values(df)
 
-    # dropping id columns
-    df = df.drop(columns=["propertylandusetypeid", "heatingorsystemtypeid"])
+    # imputation for missing values in df
+    df = impute_missing_values(df)
 
-    # heatingorsystemdesc imputation with "None" as properties are in SoCal so "None" is reasonable
-    df.heatingorsystemdesc = df.heatingorsystemdesc.fillna("None")
-
-    # dropping propertyzoningdesc we have already filtered the data to single unit properties
-    df = df.drop(columns="propertyzoningdesc")
-
-    # buildingqualitytypeid imputation
-    df.buildingqualitytypeid = df.buildingqualitytypeid.fillna(df.buildingqualitytypeid.median())
-
-    # lotsizesquarefeet imputation with mode
-    df.lotsizesquarefeet = df.lotsizesquarefeet.fillna(6000.0)
-
-    # calculatedbathnbr imputation
-    df.calculatedbathnbr = df.calculatedbathnbr.fillna(df.calculatedbathnbr.median())
-
-    # calculatedfinishedsquarefeet imputation with mode
-    df.calculatedfinishedsquarefeet = df.calculatedfinishedsquarefeet.fillna(1120.0)
-
-    # drop finishedsquarefeet12 as the info appears to be redundant when compared to calculatedfinishedsquarefeet
-    df.drop(columns="finishedsquarefeet12", inplace=True)
-
-    # fullbathcnt imputation
-    df.fullbathcnt = df.fullbathcnt.fillna(df.fullbathcnt.median())
-
-    # yearbuilt
-    df.yearbuilt = df.yearbuilt.fillna(round(df.yearbuilt.mean()))
-
-    # structuretaxvaluedollarcnt imputation based on the difference between taxvaluedollarcnt and landtaxvaluedollarcnt as 
-    # 99.9% of the values in structuretaxvaluedollarcnt are equal to this difference
-    df.structuretaxvaluedollarcnt = df.structuretaxvaluedollarcnt.fillna(df.taxvaluedollarcnt - df.landtaxvaluedollarcnt)
-
-    # drop the remaining row with no structuretaxvaluedollarcnt value as taxvaluedollarcnt and landtaxvaluedollarcnt are also missing
-    df.drop(index=62533, inplace=True)
-
-    # drop the four rows with missing taxamount
-    df.drop(index=df[df.taxamount.isna() == True].index.tolist(), inplace=True)
-
+    # # drop the rows with no structuretaxvaluedollarcnt value
+    # should only drop one row where both taxvaluedollarcnt and landtaxvaluedollarcnt are missing in addition to structuretaxvaluedollarcnt since all other 
+    # structuretaxvaluedollarcnt values have been imputed using the impute_structuretaxvaluedollarcnt function
+    # drop rows with missing taxamount
     # drop rows where censustractandblock is missing
-    df.drop(index=df[df.censustractandblock.isna() == True].index.tolist(), inplace=True)
-
     # drop rows where regionidzip is missing
-    df.drop(index=df[df.regionidzip.isna() == True].index.tolist(), inplace=True)
+    df = remove_rows(df, cols_to_mask=["structuretaxvaluedollarcnt", "taxamount", "censustractandblock", "regionidzip"])
 
-    # creating county variable
-    df["county"] = df["fips"].map({6037: "Los Angeles County", 6059: "Orange County", 6111: "Ventura County"})
-
-    # creating tax_rate variable
-    df["tax_rate"] = df.taxamount / df.taxvaluedollarcnt
+    # creating new county and tax_rate variables
+    df = create_new_variables(df)
 
     # split data into train, validate, test
     train, test = train_test_split(df, train_size=.8, random_state=56, stratify=df.county)
@@ -215,7 +253,7 @@ def prep_zillow(df):
     # KNN imputation for regionidcity
     imputer, train, validate, test = impute_regionidcity(train, validate, test)
 
-    # scale data
+    # scale numeric data
     scaler, train, validate, test = scale_numeric_data(train, validate, test)
 
     return imputer, scaler, train, validate, test
