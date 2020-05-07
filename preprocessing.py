@@ -8,6 +8,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import MinMaxScaler
 
+import wrangle_zillow as wr
+
 def impute_regionidcity(train, validate, test):
     """
     This function does the following:
