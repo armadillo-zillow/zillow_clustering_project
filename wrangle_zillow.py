@@ -100,10 +100,19 @@ def handle_missing_values(df, prop_required_column = .60, prop_required_row = .6
     """
     Docstring
     """
+
+    # establish threshold for retaining a column
     threshold = int(round(prop_required_column*len(df.index),0))
+
+    # drop columns where threshold criteria is not met
     df.dropna(axis=1, thresh=threshold, inplace=True)
+
+    # establish a threshold for retaining an index
     threshold = int(round(prop_required_row*len(df.columns),0))
+
+    # drop indices where threshold criteria is not met
     df.dropna(axis=0, thresh=threshold, inplace=True)
+
     return df
 
 def impute_missing_values(df):
@@ -235,7 +244,7 @@ def prep_zillow(df):
     # imputation for missing values in df
     df = impute_missing_values(df)
 
-    # # drop the rows with no structuretaxvaluedollarcnt value
+    # drop the rows with no structuretaxvaluedollarcnt value
     # should only drop one row where both taxvaluedollarcnt and landtaxvaluedollarcnt are missing in addition to structuretaxvaluedollarcnt since all other 
     # structuretaxvaluedollarcnt values have been imputed using the impute_structuretaxvaluedollarcnt function
     # drop rows with missing taxamount
