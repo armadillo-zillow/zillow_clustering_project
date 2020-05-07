@@ -173,22 +173,53 @@ def create_new_variables(df):
 
     return df
 
-def impute_regionidcity(train, validate, test):
-    """
-    This function does the following:
-    1. Takes in the train, validate, and test datasets
-    2. Creates the KNNImputer object
-    3. Fits the object to the regionidcity feature in the train dataset
-    4. Transforms the regionidcity feature in the train, validate, and test datasets
-    """
+def get_upper_outliers(s, k):
+    '''
+    Given a series and a cutoff value, k, returns the upper outliers for the
+    series.
 
-    imputer = KNNImputer(n_neighbors=5)
-    imputer.fit(train[["regionidcity"]])
-    train["regionidcity"] = imputer.transform(train[["regionidcity"]])
-    validate["regionidcity"] = imputer.transform(validate[["regionidcity"]])
-    test["regionidcity"] = imputer.transform(test[["regionidcity"]])
+    The values returned will be either 0 (if the point is not an outlier), or a
+    number that indicates how far away from the upper bound the observation is.
+    '''
+    q1, q3 = s.quantile([.25, .75])
+    iqr = q3 - q1
+    upper_bound = q3 + (k * iqr)
+    return s.apply(lambda x: max([x - upper_bound, 0]))
 
-    return imputer, train, validate, test
+def get_lower_outliers(s, k):
+    '''
+    Given a series and a cutoff value, k, returns the lower outliers for the
+    series.
+
+    The values returned will be either 0 (if the point is not an outlier), or a
+    number that indicates how far away from the lower bound the observation is.
+    '''
+    q1, q3 = s.quantile([.25, .75])
+    iqr = q3 - q1
+    lower_bound = q1 - (k * iqr)
+    return s.apply(lambda x: min([x - lower_bound, 0]))
+
+def add_upper_outlier_columns(df, k):
+    '''
+    Add a column with the suffix upper_outliers for all the numeric columns
+    in the given dataframe.
+    '''
+
+    for col in df.select_dtypes('number'):
+        df[col + '_upper_outliers'] = get_upper_outliers(df[col], k)
+
+    return df
+
+def add_lower_outlier_columns(df, k):
+    '''
+    Add a column with the suffix lower_outliers for all the numeric columns
+    in the given dataframe.
+    '''
+
+    for col in df.select_dtypes('number'):
+        df[col + '_lower_outliers'] = get_lower_outliers(df[col], k)
+
+    return df
 
 def convert_dtypes(df, columns=[], dtype="object"):
     """
@@ -197,31 +228,11 @@ def convert_dtypes(df, columns=[], dtype="object"):
     2. Returns a DataFrame with columns converted to specified dtype
     """
 
-    # convert some numeric variables that are categorical by nature so that they do not end up scaled
+    # convert dtype of variable
     for col in columns:
         df[col] = df[col].astype(dtype)
 
     return df
-
-def scale_numeric_data(train, validate, test):
-    """
-    Docstring
-    """
-
-    # convert some numeric variables that are categorical by nature into objects so that they do not end up scaled
-    train = convert_dtypes(train, columns=['fips', 'regionidcity', 'regionidcounty', 'regionidzip'], dtype="object")
-
-    # creating a list of features whose data type is number
-    numeric_columns = train.select_dtypes("number").columns.tolist()
-
-    # scale numeric features
-    scaler = MinMaxScaler()
-    scaler.fit(train[numeric_columns])
-    train[numeric_columns] = scaler.transform(train[numeric_columns])
-    validate[numeric_columns] = scaler.transform(validate[numeric_columns])
-    test[numeric_columns] = scaler.transform(test[numeric_columns])
-
-    return scaler, train, validate, test
 
 def prep_zillow(df):
     """
@@ -255,14 +266,23 @@ def prep_zillow(df):
     # creating new county and tax_rate variables
     df = create_new_variables(df)
 
-    # split data into train, validate, test
-    train, test = train_test_split(df, train_size=.8, random_state=56, stratify=df.county)
-    train, validate = train_test_split(train, train_size=.75, random_state=56, stratify=train.county)
+    # resetting index
+    df.reset_index(inplace=True)
 
-    # KNN imputation for regionidcity
-    imputer, train, validate, test = impute_regionidcity(train, validate, test)
+    # dropping former index
+    df.drop(columns="index", inplace=True)
 
-    # scale numeric data
-    scaler, train, validate, test = scale_numeric_data(train, validate, test)
+    # convert dtypes so that numeric categorical data is not captured by outlier functions
+    df = convert_dtypes(df, columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="object")
 
-    return imputer, scaler, train, validate, test
+    # handling upper outliers
+    df = add_upper_outlier_columns(df, 3)
+
+    # handling lower outliers
+    df = add_lower_outlier_columns(df, 3)
+
+    # convert back to numeric dtypes
+    df = convert_dtypes(df, columns=["parcelid"], dtype="int")
+    df = convert_dtypes(df, columns=["buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="float")
+
+    return df
