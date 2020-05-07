@@ -273,16 +273,16 @@ def prep_zillow(df):
     df.drop(columns="index", inplace=True)
 
     # convert dtypes so that numeric categorical data is not captured by outlier functions
-    df = convert_dtypes(df, columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="object")
+    # df = convert_dtypes(df, columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="object")
 
     # handling upper outliers
-    df = add_upper_outlier_columns(df, 3)
+    # df = add_upper_outlier_columns(df, 3)
 
     # handling lower outliers
-    df = add_lower_outlier_columns(df, 3)
+    # df = add_lower_outlier_columns(df, 3)
 
     # convert back to numeric dtypes
-    df = convert_dtypes(df, columns=["parcelid"], dtype="int")
-    df = convert_dtypes(df, columns=["buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="float")
+    # df = convert_dtypes(df, columns=["parcelid"], dtype="int")
+    # df = convert_dtypes(df, columns=["buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="float")
 
     return df
