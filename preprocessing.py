@@ -46,7 +46,7 @@ def scale_numeric_data(train, validate, test):
     """
 
     # convert some numeric variables that are categorical by nature into objects so that they do not end up scaled
-    train = convert_dtypes(train, columns=["fips", "regionidcity", "regionidcounty", "regionidzip"], dtype="object")
+    train = convert_dtypes(train, columns=["parcelid", "fips", "regionidcity", "regionidcounty", "regionidzip"], dtype="object")
 
     # creating a list of features whose data type is number
     numeric_columns = train.select_dtypes("number").columns.tolist()

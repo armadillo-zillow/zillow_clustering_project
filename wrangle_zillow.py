@@ -171,6 +171,12 @@ def create_new_variables(df):
     # creating tax_rate variable
     df["tax_rate"] = df.taxamount / df.taxvaluedollarcnt
 
+    # creating yard size
+    df['yard_size'] = df.lotsizesquarefeet - df.calculatedfinishedsquarefeet
+
+    # calculating price per sq ft
+    df['price_per_sq_ft'] = df.taxvaluedollarcnt / df.calculatedfinishedsquarefeet
+
     return df
 
 def get_upper_outliers(s, k):
