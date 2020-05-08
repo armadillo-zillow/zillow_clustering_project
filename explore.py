@@ -13,6 +13,6 @@ import wrangle_zillow as wr
 import preprocessing as pr
 
 def get_inertia(k, X):
-    kmeans = KMeans(n_clusters=k)
+    kmeans = KMeans(n_clusters=k, random_state=56)
     kmeans.fit(X)
     return kmeans.inertia_
