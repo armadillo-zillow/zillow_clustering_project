@@ -234,6 +234,19 @@ def convert_dtypes(df, columns=[], dtype="object"):
 
     return df
 
+def remove_outliers(df, k):
+    """
+    Docstring
+    """
+    
+    # IQR to detect and remove outliers
+    Q1 = df.drop(columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"]).quantile(0.25)
+    Q3 = df.drop(columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"]).quantile(0.75)
+    IQR = Q3 - Q1
+    df = df[~((df.drop(columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"]) < (Q1 - k * IQR)) | (df.drop(columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"]) > (Q3 + k * IQR))).any(axis=1)]
+    
+    return df
+
 def prep_zillow(df):
     """
     Docstring
@@ -266,23 +279,13 @@ def prep_zillow(df):
     # creating new county and tax_rate variables
     df = create_new_variables(df)
 
+    # identifying and removing outliers
+    df = remove_outliers(df, 3)
+
     # resetting index
     df.reset_index(inplace=True)
 
     # dropping former index
     df.drop(columns="index", inplace=True)
-
-    # convert dtypes so that numeric categorical data is not captured by outlier functions
-    # df = convert_dtypes(df, columns=["parcelid", "buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="object")
-
-    # handling upper outliers
-    # df = add_upper_outlier_columns(df, 3)
-
-    # handling lower outliers
-    # df = add_lower_outlier_columns(df, 3)
-
-    # convert back to numeric dtypes
-    # df = convert_dtypes(df, columns=["parcelid"], dtype="int")
-    # df = convert_dtypes(df, columns=["buildingqualitytypeid", "fips", "latitude", "longitude", "rawcensustractandblock", "regionidcity", "regionidcounty", "regionidzip", "censustractandblock", "logerror"], dtype="float")
 
     return df
